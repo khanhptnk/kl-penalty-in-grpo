@@ -1,0 +1,13 @@
+[project]
+name = "kl-penalty-in-grpo"
+version = "0.1.0"
+description = "Experiments for the post 'GRPO's KL penalty pulls toward the forward KL'"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.2",
+    "numpy>=1.26",
+    "matplotlib>=3.8",
+]
+
+[tool.uv]
+package = false

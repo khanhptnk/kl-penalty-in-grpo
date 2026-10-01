@@ -1,0 +1,5 @@
+beta 0.05  optimum entropy 0.000 | k1 in reward 0.039 ± 0.001 | k2 as loss 0.038 ± 0.001 | k3 as loss 0.464 ± 0.001
+beta 0.1   optimum entropy 0.010 | k1 in reward 0.069 ± 0.003 | k2 as loss 0.062 ± 0.002 | k3 as loss 0.816 ± 0.005
+beta 0.2   optimum entropy 0.682 | k1 in reward 0.736 ± 0.049 | k2 as loss 0.511 ± 0.033 | k3 as loss 1.379 ± 0.012
+beta 0.5   optimum entropy 2.583 | k1 in reward 2.591 ± 0.007 | k2 as loss 2.481 ± 0.017 | k3 as loss 2.414 ± 0.019
+beta 1.0   optimum entropy 2.783 | k1 in reward 2.783 ± 0.003 | k2 as loss 2.778 ± 0.003 | k3 as loss 2.799 ± 0.004
