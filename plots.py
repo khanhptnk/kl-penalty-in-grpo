@@ -81,41 +81,29 @@ def fig_coefficient(c, out):
     plt.close(fig)
 
 
-# ---------------------------------------------------------------- figure 2: entropy
+# ---------------------------------------------------------------- figure 2: where training settles, vs beta
 def fig_entropy(c, data, out):
-    fig, (a1, a2) = new_fig(c, w=7.4, h=3.7, ncols=2)
+    fig, (a1, a2) = new_fig(c, w=7.4, h=3.5, ncols=2)
     for ax in (a1, a2):
         style(ax, c)
     series = [("k1 in reward", "$k_1$ in reward", c["k1"]), ("k2 as loss", "$k_2$ as loss", c["k2"]),
               ("k3 as loss", "$k_3$ as loss", c["k3"])]
-    opt = {b: v["entropy"] for b, v in data["optimum"].items()}
-    # (a) entropy over training at beta = 0.2
-    steps = np.arange(len(data["curves"]["k3 as loss"][0])) * 25
-    nk = np.array(data["curves"]["no KL"])
-    a1.plot(steps, nk.mean(0), color=c["ref"], lw=1.2, ls=(0, (4, 3)), label="no KL")
-    for key, name, col in series:
-        arr = np.array(data["curves"][key])
-        a1.fill_between(steps, arr.min(0), arr.max(0), color=col, alpha=0.18, lw=0)
-        a1.plot(steps, arr.mean(0), color=col, lw=LW, label=name)
-    a1.axhline(opt["0.2"], color=c["ink2"], lw=1.1, ls=(0, (1, 2)), label="reverse-KL optimum")
-    a1.set_xlabel("step (β = 0.2)")
-    a1.set_ylabel("entropy of $P_\\theta(y)$ (nats)")
-    a1.set_title("(a) entropy during training", color=c["ink"], fontsize=11, loc="left")
-    legend(a1, c, loc="upper right", fontsize=9)
-    # (b) final entropy vs beta
-    betas = sorted(float(b) for b in opt)
-    a2.plot(betas, [opt[str(b)] for b in betas], color=c["ink2"], lw=1.2, ls=(0, (1, 2)), marker="o", ms=4,
-            label="reverse-KL optimum")
-    for key, name, col in series:
-        m = [np.mean([r["entropy"] for r in data["sweep"][key][str(b)]]) for b in betas]
-        s = [np.std([r["entropy"] for r in data["sweep"][key][str(b)]]) for b in betas]
-        a2.errorbar(betas, m, yerr=s, color=col, lw=LW, marker="o", ms=5, capsize=0, label=name)
-    a2.set_xscale("log")
-    a2.set_xticks(betas, [f"{b:g}" for b in betas])
-    a2.set_xlabel("KL coefficient β")
-    a2.set_ylabel("final entropy (nats)")
-    a2.set_title("(b) final entropy vs β", color=c["ink"], fontsize=11, loc="left")
-    legend(a2, c, loc="upper left", fontsize=9)
+    betas = sorted(float(b) for b in data["optimum"])
+    for ax, key, ylabel, title in ((a1, "entropy", "entropy (nats)", "(a) entropy of the policy"),
+                                   (a2, "P(target)", "probability", "(b) P(rewarded sequence)")):
+        ax.plot(betas, [data["optimum"][str(b)][key] for b in betas], color=c["ink2"], lw=1.2, ls=(0, (1, 2)),
+                marker="o", ms=4, label="optimum")
+        for name, lab, col in series:
+            runs = [[r[key] for r in data["sweep"][name][str(b)]] for b in betas]
+            ax.errorbar(betas, [np.mean(r) for r in runs], yerr=[np.std(r) for r in runs], color=col, lw=LW,
+                        marker="o", ms=5, capsize=0, label=lab)
+        ax.set_xscale("log")
+        ax.set_xticks(betas, [f"{b:g}" for b in betas])
+        ax.minorticks_off()
+        ax.set_xlabel("KL coefficient β")
+        ax.set_ylabel(ylabel)
+        ax.set_title(title, color=c["ink"], fontsize=11, loc="left")
+    legend(a1, c, loc="upper left", fontsize=9)
     fig.tight_layout()
     fig.savefig(out, format="svg", transparent=True)
     plt.close(fig)

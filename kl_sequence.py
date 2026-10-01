@@ -7,6 +7,10 @@ is an exact sum. Checks:
   B. ... which differs from the sequence-level forward KL KL(P_ref || P_pi), more so the further pi is from pi_ref
   C. k1 in the reward, with reward-to-go returns  ==  grad of the sequence-level reverse KL KL(P_pi || P_ref)
   D. per-token k2 as a loss misses exactly the part of that gradient that flows through future tokens
+  E. per-token k2 as a loss  ==  grad of  sum_t E_{prefix ~ pi}[ KL(pi(.|prefix) || pi_ref(.|prefix)) ]
+     (a reverse KL at every position, prefix weights not differentiated: the mirror image of A)
+  F. per-token k2 as a loss  ==  k1 in the reward with each token charged only its own KL (no reward-to-go)
+  G. per-token k1 as a loss has zero expected gradient
 
 Run: uv run kl_sequence.py        (CPU, ~5 s; writes results/sequence.json)
 """
@@ -46,12 +50,16 @@ def gradients(theta: torch.Tensor, logq: torch.Tensor) -> dict:
     k1 = (lp - lq).detach()
     # sum over positions of the forward KL at each prefix, weighted by P_pi(prefix) (frozen)
     fwd_per_prefix = (logq.exp() * (logq - theta.log_softmax(-1))).sum(-1)
+    rev_per_prefix = (theta.softmax(-1) * (theta.log_softmax(-1) - logq)).sum(-1)  # KL(pi(.|h) || pi_ref(.|h))
     prefix_weight = torch.zeros(len(PREFIXES)).index_add_(0, PIDX.flatten(), w.repeat_interleave(T))
     return {
         "seq reverse KL": grad((P * (logP - logQ)).sum()),
         "seq forward KL": grad((Q * (logQ - logP)).sum()),
         "k3 as loss (per token)": grad((w * (log_r.exp() - 1 - log_r).sum(-1)).sum()),
         "per-position forward KL on pi's prefixes": grad((prefix_weight * fwd_per_prefix).sum()),
+        "per-position reverse KL on pi's prefixes": grad((prefix_weight * rev_per_prefix).sum()),
+        "k1 in reward (own token only)": grad((w * (k1 * lp).sum(-1)).sum()),
+        "k1 as loss (per token)": grad((w * (lp - lq).sum(-1)).sum()),
         "k1 in reward (reward-to-go)": grad((w * (reward_to_go(k1) * lp).sum(-1)).sum()),
         "k2 as loss (per token)": grad((w * (0.5 * log_r**2).sum(-1)).sum()),
         "future-token part": grad((w * ((reward_to_go(k1) - k1) * lp).sum(-1)).sum()),
@@ -77,6 +85,12 @@ if __name__ == "__main__":
         "D: k2 as loss == sequence reverse KL": torch.allclose(G["k2 as loss (per token)"], G["seq reverse KL"]),
         "D: k2 as loss + future-token part == sequence reverse KL":
             torch.allclose(G["k2 as loss (per token)"] + G["future-token part"], G["seq reverse KL"]),
+        "E: k2 as loss == per-position reverse KL on pi's prefixes":
+            torch.allclose(G["k2 as loss (per token)"], G["per-position reverse KL on pi's prefixes"]),
+        "F: k2 as loss == k1 in reward, own token only":
+            torch.allclose(G["k2 as loss (per token)"], G["k1 in reward (own token only)"]),
+        "G: k1 as loss has zero expected gradient":
+            torch.allclose(G["k1 as loss (per token)"], torch.zeros_like(G["k1 as loss (per token)"]), atol=1e-12),
     }
     gaps = {}
     for alpha in (0.01, 0.1, 0.3, 1.0, 2.0):  # pi = pi_ref + alpha * direction (in logit space)
@@ -85,8 +99,11 @@ if __name__ == "__main__":
             "k3 as loss vs sequence forward KL": rel(Ga["k3 as loss (per token)"], Ga["seq forward KL"]),
             "k2 as loss vs sequence reverse KL": rel(Ga["k2 as loss (per token)"], Ga["seq reverse KL"]),
         }
-        checks[f"A, C, D at alpha {alpha}"] = all((
+        checks[f"A, C, D, E, F, G at alpha {alpha}"] = all((
+            torch.allclose(Ga["k1 as loss (per token)"], torch.zeros_like(Ga["k1 as loss (per token)"]), atol=1e-12),
             torch.allclose(Ga["k3 as loss (per token)"], Ga["per-position forward KL on pi's prefixes"]),
+            torch.allclose(Ga["k2 as loss (per token)"], Ga["per-position reverse KL on pi's prefixes"]),
+            torch.allclose(Ga["k2 as loss (per token)"], Ga["k1 in reward (own token only)"]),
             torch.allclose(Ga["k1 in reward (reward-to-go)"], Ga["seq reverse KL"]),
             torch.allclose(Ga["k2 as loss (per token)"] + Ga["future-token part"], Ga["seq reverse KL"]),
         ))

@@ -39,11 +39,18 @@ one large jump at a random time (whenever J is first sampled); k2 never does.
 - **C.** k1 in the reward with reward-to-go returns gives exactly the sequence-level reverse-KL gradient. *(True.)*
 - **D.** Per-token k2 as a loss misses the part of that gradient that flows through future tokens *(False)*; adding that
   part back recovers it exactly *(True)*.
+- **E.** Per-token k2 as a loss has exactly the gradient of the per-position *reverse* KL on the policy's prefixes, the
+  mirror image of A. *(True.)*
+- **F.** Per-token k2 as a loss equals k1 in the reward with each token charged only for its own KL, so the returns are the
+  whole difference between the two. *(True.)*
+- **G.** Per-token k1 as a loss has zero expected gradient. *(True.)*
+
+A, C, E, F and G are also checked at five distances between π and π_ref.
 
 **`entropy_rl.py`**: REINFORCE with one rewarded sequence, the same tabular policy, and each KL implementation at
 β ∈ {0.05, 0.1, 0.2, 0.5, 1}, 10 seeds each. k1 in the reward lands on the closed-form optimum of the reverse-KL-regularized
-objective. k3 as a loss reaches a different fixed point: much higher entropy when the reward dominates (small β), slightly
-lower entropy when the regularizer dominates (β = 0.5).
+objective. k2 as a loss under-regularizes (more reward than the optimum). k3 as a loss misses in both directions: when the
+reward dominates (β ≤ 0.2) it keeps much more entropy and less reward than the optimum; at β = 0.5, the opposite.
 
 ## Caveats
 
